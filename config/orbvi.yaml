@@ -1,0 +1,24 @@
+schema_version: 1
+camera:
+  width: 1280
+  height: 1088
+  fps: 60
+  bitrate_kbps: 4000
+imu:
+  frequency_hz: 1000
+  accel_range_g: 16
+  gyro_range_dps: 2000
+transport:
+  host: host.docker.internal
+  rtsp_base_port: 15554
+  control_port: 15602
+  rtsp_path: /live/PRR
+  imu_bind_address: 0.0.0.0
+  imu_port: 5600
+runtime:
+  image_queue: 64
+  imu_queue: 2048
+ros:
+  topic_prefix: /orbvi/raw
+  image_queue: 16
+  imu_queue: 2048

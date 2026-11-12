@@ -1,0 +1,11 @@
+build/
+install/
+__pycache__/
+*.pyc
+backend/
+tools/orbvi_board-aarch64
+tools/ffmpeg-*.tar.xz
+.DS_Store
+/reports/
+/MANIFEST.sha256
+/third_party/orbvi-4p-sdk/docs/rtsp-color-validation-20261104.md

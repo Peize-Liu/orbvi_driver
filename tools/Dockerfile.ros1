@@ -1,0 +1,21 @@
+FROM ros:noetic-ros-base
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake pkg-config libyaml-cpp-dev libavcodec-dev libavformat-dev \
+    libavutil-dev libswscale-dev python3-yaml ros-noetic-sensor-msgs \
+    ros-noetic-diagnostic-msgs ros-noetic-message-generation \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /work
+# Focal's FFmpeg 4.2 cannot export the capture SEI metadata. Build a small 4.4
+# runtime rather than dropping board timestamps in the ROS 1 wrapper.
+COPY ffmpeg-4.4.5.tar.xz /tmp/ffmpeg.tar.xz
+RUN echo 'f9514e0d3515aee5a271283df71636e1d1ff7274b15853bcd84e144be416ab07  /tmp/ffmpeg.tar.xz' | sha256sum -c - \
+    && mkdir /tmp/ffmpeg && tar -xf /tmp/ffmpeg.tar.xz -C /tmp/ffmpeg --strip-components=1 \
+    && cd /tmp/ffmpeg && ./configure --prefix=/opt/orbvi/ffmpeg \
+       --disable-everything --disable-autodetect --disable-programs --disable-doc \
+       --disable-avdevice --disable-avfilter --disable-swresample --disable-postproc \
+       --enable-shared --disable-static --enable-pic --enable-network \
+       --enable-decoder=h264 --enable-parser=h264 --enable-demuxer=rtsp,rtp,h264 \
+       --enable-protocol=tcp,udp,rtp,http,file \
+    && make -j3 && make install && rm -rf /tmp/ffmpeg /tmp/ffmpeg.tar.xz
+ENV PKG_CONFIG_PATH=/opt/orbvi/ffmpeg/lib/pkgconfig
+ENV LD_LIBRARY_PATH=/opt/orbvi/ffmpeg/lib

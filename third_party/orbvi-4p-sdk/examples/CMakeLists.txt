@@ -1,0 +1,20 @@
+add_executable(orbvi_sdk_fake_demo fake_demo.cpp)
+target_link_libraries(orbvi_sdk_fake_demo PRIVATE orbvi_sdk::shared)
+
+add_executable(orbvi_sdk_rtsp_demo rtsp_demo.cpp)
+target_link_libraries(orbvi_sdk_rtsp_demo PRIVATE orbvi_sdk::shared)
+
+add_executable(orbvi_sdk_rtsp_four_demo rtsp_four_demo.cpp)
+target_link_libraries(orbvi_sdk_rtsp_four_demo PRIVATE orbvi_sdk::shared)
+
+add_executable(orbvi_sdk_rtsp_sync_check rtsp_sync_check.cpp)
+target_link_libraries(orbvi_sdk_rtsp_sync_check PRIVATE orbvi_sdk::shared)
+
+add_executable(orbvi_sdk_udp_imu_demo udp_imu_demo.cpp)
+target_link_libraries(orbvi_sdk_udp_imu_demo PRIVATE orbvi_sdk::shared)
+
+add_executable(orbvi_sdk_image_stream_demo image_stream_demo.cpp)
+target_link_libraries(orbvi_sdk_image_stream_demo PRIVATE orbvi_sdk::shared)
+
+add_executable(orbvi_sdk_temperature_stream_demo temperature_stream_demo.cpp)
+target_link_libraries(orbvi_sdk_temperature_stream_demo PRIVATE orbvi_sdk::shared)

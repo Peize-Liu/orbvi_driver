@@ -1,0 +1,15 @@
+{
+  "orbvi-4p-demo-ros": {
+    "commit": "490b74ceca99b983023770ab79d8de941243b04c",
+    "remote": "https://github.com/ORBVI/orbvi-4p-demo.git"
+  },
+  "orbvi-4p-sdk": {
+    "commit": "4448afc20b300f29b416748af7541686c9a926d7",
+    "remote": "https://github.com/ORBVI/orbvi-4p-sdk.git"
+  },
+  "ffmpeg": {
+    "version": "4.4.5",
+    "url": "https://ffmpeg.org/releases/ffmpeg-4.4.5.tar.xz",
+    "sha256": "f9514e0d3515aee5a271283df71636e1d1ff7274b15853bcd84e144be416ab07"
+  }
+}

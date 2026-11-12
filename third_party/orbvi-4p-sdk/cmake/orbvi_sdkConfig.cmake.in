@@ -1,0 +1,19 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(Threads)
+find_dependency(PkgConfig)
+pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
+  libavformat
+  libavcodec
+  libavutil
+  libswscale)
+include("${CMAKE_CURRENT_LIST_DIR}/orbvi_sdkTargets.cmake")
+
+if(TARGET orbvi_sdk::shared AND NOT TARGET orbvi_sdk::orbvi_sdk)
+  add_library(orbvi_sdk::orbvi_sdk INTERFACE IMPORTED)
+  set_property(TARGET orbvi_sdk::orbvi_sdk PROPERTY
+    INTERFACE_LINK_LIBRARIES orbvi_sdk::shared)
+endif()
+
+check_required_components(orbvi_sdk)

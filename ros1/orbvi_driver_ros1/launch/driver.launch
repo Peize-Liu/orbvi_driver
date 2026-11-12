@@ -1,0 +1,6 @@
+<launch>
+  <arg name="config"/>
+  <node pkg="orbvi_driver_ros1" type="orbvi_node" name="orbvi_driver" output="screen">
+    <param name="config" value="$(arg config)"/>
+  </node>
+</launch>

@@ -1,0 +1,13 @@
+FROM ros:humble-ros-base
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake pkg-config libavcodec-dev libavformat-dev libavutil-dev \
+    libswscale-dev libyaml-cpp-dev python3-colcon-common-extensions \
+    ros-humble-launch-testing-ament-cmake ros-humble-rmw-cyclonedds-cpp \
+    && rm -rf /var/lib/apt/lists/*
+ENV ROS_DOMAIN_ID=86
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+WORKDIR /work
+
+RUN apt-get update && apt-get install -y --no-install-recommends python3-pil && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*

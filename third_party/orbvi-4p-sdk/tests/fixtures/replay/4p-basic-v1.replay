@@ -1,0 +1,7 @@
+# ORBVI 4P Host SDK replay fixture. Draft contract fingerprint: cpp-abi-1.
+orbvi-replay-v1
+product=4p-x5 layout=grid_2x2_1280x1088_ports_v1 protocol=0.1
+frame camera=0 sequence=1 group_id=1 timestamp_ns=1000000 sensor_timestamp_ns=1000000 width=8 height=4 stride=8 format=gray8 crc=1 data=0102030405060708
+frame camera=1 sequence=1 group_id=1 timestamp_ns=1000001 sensor_timestamp_ns=1000001 width=8 height=4 stride=8 format=gray8 crc=1 data=1112131415161718
+sync sequence=1 group_id=1 timestamp_ns=1000000 sensor_timestamp_ns=1000000 mask=15 crc=1
+imu sequence=1 timestamp_ns=1000000 sensor_timestamp_ns=1000000 accel_x=0 accel_y=0 accel_z=9.80665 gyro_x=0 gyro_y=0 gyro_z=0 crc=1
