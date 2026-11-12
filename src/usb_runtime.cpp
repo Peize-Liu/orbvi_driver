@@ -15,6 +15,7 @@ extern "C" {
 }
 namespace orbvi_driver {
 namespace {
+struct BridgeInterrupted : std::runtime_error { using std::runtime_error::runtime_error; };
 class Decoder {
   AVCodecContext* codec_=nullptr;AVFrame* frame_=nullptr;AVFrame* pixels_=nullptr;AVPacket* packet_=nullptr;
   orbvi_sdk::detail::RtspFrameConverter converter_;
@@ -76,7 +77,7 @@ struct UsbRuntime::Impl {
       auto root=YAML::Load(std::string(m.payload.begin(),m.payload.end()));verify_configuration(config,root);
       if(root["usb_protocol"].as<int>()!=1)throw std::runtime_error("USB driver protocol mismatch");
       std::lock_guard<std::mutex> lock(mutex);counters.mux_drops=root["usb_mux_dropped"].as<uint64_t>();
-      counters.mux_invalid=root["usb_mux_invalid"].as<uint64_t>();verified=true;ready.notify_all();return;
+      counters.mux_invalid=root["usb_mux_invalid"].as<uint64_t>();if(!done)counters.error.clear();verified=true;ready.notify_all();return;
     }
     unsigned index=4;
     if(m.type==usb::camera){if(m.payload.size()<5||(index=unsigned(usb::le(m.payload.data(),4)))>=4)throw std::runtime_error("invalid USB camera payload");}
@@ -90,16 +91,48 @@ struct UsbRuntime::Impl {
     int fd=-1;
     try{
       std::unique_ptr<usb::Device> device;
-      if(config.usb_backend=="direct")device=std::make_unique<usb::Device>(config.usb_serial);else fd=connect_bridge(config);
-      usb::Parser parser{bool(device)};std::vector<uint8_t> bytes(1024*1024);
-      auto last=std::chrono::steady_clock::now();
-      while(!done){int n=0;
-        if(device)n=device->read(bytes.data(),bytes.size());
-        else {pollfd p{fd,POLLIN,0};int r=poll(&p,1,200);if(r<0&&errno!=EINTR)throw std::runtime_error("USB bridge poll failed");
-          if(r>0){n=int(recv(fd,bytes.data(),bytes.size(),0));if(n==0)throw std::runtime_error("USB bridge disconnected");
-            if(n<0&&errno!=EAGAIN&&errno!=EINTR)throw std::runtime_error("USB bridge receive failed");}}
-        if(n>0){last=std::chrono::steady_clock::now();parser.feed(bytes.data(),n,[&](usb::Message m){enqueue(std::move(m));});}
-        else if(std::chrono::steady_clock::now()-last>std::chrono::seconds(5))throw std::runtime_error("USB data timed out");
+      if(config.usb_backend=="direct")device=std::make_unique<usb::Device>(config.usb_serial);
+      else fd=connect_bridge(config);
+      std::vector<uint8_t> bytes(1024*1024);
+      while(!done){
+        try {
+          usb::Parser parser{bool(device)};
+          auto last=std::chrono::steady_clock::now();
+          while(!done){int n=0;
+            if(device)n=device->read(bytes.data(),bytes.size());
+            else {pollfd p{fd,POLLIN,0};int r=poll(&p,1,200);
+              if(r<0&&errno!=EINTR)throw BridgeInterrupted("USB bridge poll failed");
+              if(r>0){n=int(recv(fd,bytes.data(),bytes.size(),0));
+                if(n==0)throw BridgeInterrupted("USB bridge disconnected");
+                if(n<0&&errno!=EAGAIN&&errno!=EWOULDBLOCK&&errno!=EINTR)throw BridgeInterrupted("USB bridge receive failed");}}
+            if(n>0){last=std::chrono::steady_clock::now();parser.feed(bytes.data(),n,[&](usb::Message m){enqueue(std::move(m));});}
+            else if(std::chrono::steady_clock::now()-last>std::chrono::seconds(5)){
+              if(device)throw std::runtime_error("USB data timed out");
+              throw BridgeInterrupted("USB bridge data timed out");
+            }
+          }
+        }catch(const BridgeInterrupted& e){
+          if(fd>=0){close(fd);fd=-1;}
+          {
+            std::lock_guard<std::mutex> lock(mutex);
+            if(done)break;
+            counters.error=std::string(e.what())+"; reconnecting";
+            verified=false;
+            // Never replay stale queued samples after a link interruption.
+            for(unsigned i=0;i<queues.size();++i){
+              if(i==4)counters.imu_drops+=queues[i].size();else counters.image_drops+=queues[i].size();
+              queues[i].clear();
+            }
+          }
+          // Only transient bridge I/O is retried. Framing, configuration and
+          // decoder errors remain fatal; a fresh config must precede new data.
+          while(!done&&fd<0){
+            {std::unique_lock<std::mutex> lock(mutex);
+             ready.wait_for(lock,std::chrono::milliseconds(500),[&]{return done.load();});}
+            if(done)break;
+            try{fd=connect_bridge(config);}catch(const std::exception&){/* retry */}
+          }
+        }
       }
     }catch(const std::exception& e){if(!done)fail(e.what());}
     if(fd>=0)close(fd);

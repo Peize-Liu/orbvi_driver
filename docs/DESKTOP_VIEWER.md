@@ -11,6 +11,7 @@ The renderer runs sandboxed with context isolation and without Node.js access. T
 - Camera skew is the maximum timestamp spread of the dashboard's latest 600 matched groups (within a 1 ms matching window). It is not an exposure calibration or end-to-end latency measurement.
 - IMU count, frequency, gaps and error counters come from the full C++ diagnostic stream. The plot uses approximately 50 Hz latest-sample observations and cannot characterize 1000 Hz shock peaks.
 - Core diagnostic counters are cumulative for the receiver process. Camera metadata counters are cumulative for the dashboard process. Exports include the last status snapshot, its connection state and independent display counters, without images.
+- The preview initially buffers about 300 ms of media. It adjusts playback speed to 1.02× only when media backlog exceeds 500 ms and seeks only for a backlog over 1 second (with a 2-second cooldown). The per-camera buffer value is queued media duration, not end-to-end latency; waiting counts exclude deliberate pauses and seeks.
 - Pausing freezes the preview and charts while acquisition and health polling continue. Video buffering remains bounded. Resuming seeks near the live edge. A stalled video connection is retried automatically.
 
 ## Verification
@@ -31,3 +32,13 @@ The test checks four decoded streams, capture rates and diagnostics, sandbox iso
 The packaged artifact is a local unsigned Apple Silicon macOS app. Windows and Linux packaging have not been verified.
 
 Verified on 2026-11-12 with the packaged Electron 45.3.1 macOS arm64 app and a live X5 USB source: all smoke checks passed; four capture rates 59.998–60.002 Hz, displayed rates 59.95–60.01 fps, IMU 1010.94 Hz. Core gaps, invalid packets, callback drops, transport drops and IMU pairing errors were zero. Chromium reported 18–21 cumulative display drops per stream during startup/playback; these are not capture losses. The recent matched timestamp spread was 130.334 µs. Capture continued after the app closed. These observations do not establish calibrated sensor accuracy or end-to-end latency.
+
+## Playback profiling
+
+`desktop/tests/playback-profile.cjs` records frame callback gaps, waiting/seeking events, media buffer depth and before/after core diagnostics. It uses `PLAYWRIGHT_MODULE` and `ELECTRON_EXECUTABLE` like the smoke test. Set `PROFILE_OUTPUT` for a local JSON report, `PROFILE_SECONDS` (default 60), and optionally `JITTER_MS` to delay the test proxy's video delivery every 3 seconds without interrupting capture.
+
+During the 2026-11-12 stutter investigation, the original viewer ran for 60 seconds without a frame callback gap over 100 ms, a waiting event or a seek; maximum callback gap was 35.4 ms. Core transport errors and gaps stayed at zero. A later run captured simultaneous camera/IMU stalling with a `USB data timed out` diagnostic. The host bridge continued reporting received USB bytes, and a new container connection could receive data. The original receiver stopped permanently on this transient I/O failure. The underlying interruption trigger remains unconfirmed. The old 350 ms hard-seek threshold was replaced to avoid unnecessary jumps during moderate backlog, and buffer/wait telemetry was added for future diagnosis.
+
+The C++ bridge receiver now retries transient disconnects, socket I/O errors and 5-second read timeouts. Each retry creates a fresh parser and waits for a validated configuration before admitting samples. Queued old samples are counted as drops and discarded; sequence history is retained so interruptions remain visible. Protocol, incompatible configuration, decoder and direct-USB device errors remain fatal. `usb_bridge_recovery` exercises disconnect recovery, idle-timeout recovery, pre-handshake sample rejection, retained gaps and fatal configuration mismatch using a fake loopback bridge, without hardware.
+
+After the change, a 40-second live run with 180 ms video-delivery delays injected every 3 seconds recorded no seeks and no frame callback gap above 100 ms (maximum 34.4 ms). One camera emitted one brief `waiting` event. This is a bounded jitter check, not evidence that all intermittent link interruptions have been eliminated. Recovery tests passed in both Humble and Noetic builds.
