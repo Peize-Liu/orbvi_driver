@@ -1,5 +1,7 @@
 # ORBVI Electron 上位机
 
+[English](README.en.md) | [简体中文](README.md)
+
 当前打包目标为 **Apple Silicon Mac（macOS arm64）**。编译、打包需要 Node.js **22.12 或更高版本**及 npm；推荐 Node.js 24。打包时无需连接开发板。
 
 ## 获取源码和安装依赖

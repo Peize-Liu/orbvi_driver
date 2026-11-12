@@ -1,5 +1,7 @@
 # ORBVI 四目相机 + IMU 驱动
 
+[English](README.en.md) | [简体中文](README.md)
+
 提供原生 C++、ROS 2 Humble、ROS 1 Noetic 三种接口，统一使用 [config/orbvi.yaml](config/orbvi.yaml)。
 
 默认通过原生 USB Bulk 传输四路图像和 IMU。ADB 仅用于部署、启动和停止板端程序。
