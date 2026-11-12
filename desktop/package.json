@@ -1,0 +1,17 @@
+{
+  "name": "orbvi-viewer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ORBVI four-camera and IMU desktop monitor",
+  "main": "main.cjs",
+  "engines": {"node": ">=22.12.0"},
+  "scripts": {
+    "prepare-ui": "node prepare.cjs",
+    "start": "npm run prepare-ui && electron .",
+    "package": "npm run prepare-ui && electron-packager . 'ORBVI Viewer' --platform=darwin --arch=arm64 --out=dist --overwrite --app-bundle-id=com.orbvi.viewer --ignore='^/(dist|tests|prepare.cjs)$'"
+  },
+  "devDependencies": {
+    "electron": "45.3.1",
+    "@electron/packager": "20.3.0"
+  }
+}

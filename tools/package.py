@@ -6,7 +6,7 @@ from pathlib import Path
 import tarfile
 
 ROOT = Path(__file__).resolve().parents[1]
-EXCLUDED = {'.git', '__pycache__', '.DS_Store', '.build', 'build', 'install'}
+EXCLUDED = {'.git', '__pycache__', '.DS_Store', '.build', 'build', 'install', 'node_modules', 'dist'}
 
 
 def digest(path):
@@ -27,7 +27,7 @@ def main():
     manifest = ROOT / 'MANIFEST.sha256'
     files = sorted(p for p in ROOT.rglob('*') if p.is_file()
                    and not any(part in EXCLUDED for part in p.relative_to(ROOT).parts)
-                   and p != manifest)
+                   and p != manifest and not p.is_relative_to(ROOT / 'desktop' / 'ui'))
     entries = [(digest(path), path) for path in files]
     manifest.write_text(''.join(f'{value}  {path.relative_to(ROOT).as_posix()}\n'
                                 for value, path in entries))

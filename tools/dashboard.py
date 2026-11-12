@@ -62,6 +62,8 @@ class Dashboard(Node):
         self.cameras = [Stream() for _ in range(4)]
         self.imu = Stream()
         self.imu_rate = 0.
+        self.driver_diagnostics = None
+        self.diagnostic_arrival = 0
         self.jpegs = [None] * 4
         self.image_times = [0.] * 4
         self.image_counts = [0] * 4
@@ -108,6 +110,9 @@ class Dashboard(Node):
             if status.name != 'orbvi_driver':
                 continue
             values = {v.key: v.value for v in status.values}
+            with self.lock:
+                self.driver_diagnostics = dict(level=(status.level[0] if isinstance(status.level, bytes) else int(status.level)), message=status.message, values=values)
+                self.diagnostic_arrival = time.monotonic()
             if 'imu_last_timestamp_ns' not in values:
                 continue
             count, stamp = int(values['imu_count']), int(values['imu_last_timestamp_ns'])
@@ -150,6 +155,8 @@ class Dashboard(Node):
                        statistics_source='C++ driver diagnostics; preview receives latest samples only')
             return dict(configuration=CONFIG, cameras=cameras, imu=imu, latest_imu=self.latest_imu,
                         history=list(self.history), uptime=now-self.started,
+                        diagnostics=(dict(self.driver_diagnostics, age_ms=(now-self.diagnostic_arrival)*1000)
+                                     if self.driver_diagnostics else None),
                         sync=dict(groups=self.sync_groups, max_skew_us=max(self.sync_skews, default=0)/1000))
 
 
@@ -161,8 +168,11 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == '/api/status':
             data, mime = json.dumps(self.server.node.snapshot()).encode(), 'application/json'
-        elif path == '/':
-            data, mime = Path(__file__).with_name('dashboard.html').read_bytes(), 'text/html; charset=utf-8'
+        elif path in ('/', '/dashboard.css', '/dashboard.js'):
+            name, mime = {'/': ('dashboard.html', 'text/html; charset=utf-8'),
+                          '/dashboard.css': ('dashboard.css', 'text/css'),
+                          '/dashboard.js': ('dashboard.js', 'text/javascript')}[path]
+            data = Path(__file__).with_name(name).read_bytes()
         else:
             self.send_error(404)
             return

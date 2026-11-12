@@ -38,6 +38,29 @@ python3 tools/run_ros.py ros2 --config config/orbvi.yaml --dashboard
 
 网页地址：<http://127.0.0.1:18765/>。ROS 节点运行在 Docker 容器内；Mac 的本机 libusb 接收器将 USB 数据交给容器。
 
+## Electron 上位机
+
+先按上文启动 USB、板端采集和 `--dashboard` 服务，再启动桌面窗口（Node.js 22.12+）：
+
+```sh
+cd desktop
+npm ci
+npm start
+```
+
+窗口显示四路 RGB、采集/显示帧率、IMU 三轴曲线、同步时间戳差和核心异常计数。点击图像可全屏；可暂停显示、重新连接、导出 JSON 状态。关闭窗口不停止采集。IMU 曲线约 50 Hz 抽样，四路预览独立播放。
+
+生成 Apple Silicon Mac 应用：
+
+```sh
+npm run package
+open "dist/ORBVI Viewer-darwin-arm64/ORBVI Viewer.app"
+```
+
+默认连接 `http://127.0.0.1:18765`。可用 `ORBVI_DASHBOARD_URL=http://127.0.0.1:端口 npm start` 指定其他本机预览服务端口。
+
+## 停止采集
+
 停止网页和板端采集：
 
 ```sh
