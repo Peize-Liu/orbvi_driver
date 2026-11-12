@@ -40,6 +40,8 @@ python3 tools/run_ros.py ros2 --config config/orbvi.yaml --dashboard
 
 ## Electron 上位机
 
+完整的依赖安装、编译打包和运行步骤见 [desktop/README.md](desktop/README.md)。当前打包目标为 Apple Silicon Mac。
+
 先按上文启动 USB、板端采集和 `--dashboard` 服务，再启动桌面窗口（Node.js 22.12+）：
 
 ```sh
