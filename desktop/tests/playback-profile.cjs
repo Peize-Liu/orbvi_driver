@@ -21,7 +21,7 @@ const http=require('node:http');
  const app=await electron.launch({executablePath:process.env.ELECTRON_EXECUTABLE,args:[],
   env:{...process.env,ORBVI_DASHBOARD_URL:`http://127.0.0.1:${proxy.address().port}`}});
  try{
- const page=await app.firstWindow();
+ const page=await app.firstWindow();await page.waitForLoadState('domcontentloaded');await page.evaluate(()=>localStorage.setItem('orbvi-preview-mode','buffered'));await page.reload({waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.orbviVideoStats?.every(x=>x.width>0),undefined,{timeout:45000});
  await page.waitForTimeout(5000);
  const start=await page.evaluate(async()=>await(await fetch('/api/status')).json());

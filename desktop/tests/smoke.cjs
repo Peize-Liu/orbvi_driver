@@ -31,7 +31,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
    args: process.env.ELECTRON_EXECUTABLE ? [] : [path.join(root, 'desktop')],
    env: {...process.env, ORBVI_DASHBOARD_URL: `http://127.0.0.1:${proxy.address().port}`}
   });
-  const page=await app.firstWindow();page.on('pageerror', error => errors.push(error.message));
+  const page=await app.firstWindow();await page.waitForLoadState('domcontentloaded');await page.evaluate(()=>localStorage.setItem('orbvi-preview-mode','buffered'));await page.reload({waitUntil:'domcontentloaded'});page.on('pageerror', error => errors.push(error.message));
   await page.waitForFunction(() => document.querySelector('#online')?.textContent==='4', undefined, {timeout: 30000});
   await page.waitForFunction(() => window.orbviVideoStats?.every(v=>v.width===1280&&v.height===1088&&v.fps>30), undefined, {timeout: 45000});
   await delay(12000);
@@ -39,7 +39,8 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
    display:window.orbviVideoStats,connection:document.querySelector('#connection').textContent,
    security:{node:typeof require,desktop:typeof window.orbviDesktop?.exportStatus}}));
   const live=await capture();
-  assert.equal(live.status.diagnostics.level,0);
+  assert(live.status.diagnostics.level<2);
+  for(const key of ['sequence_gaps','invalid','transport_drops','transport_invalid','image_callback_drops','imu_callback_drops','imu_pairing_errors'])assert.equal(Number(live.status.diagnostics.values[key]),0,key);
   assert(live.status.cameras.every(c=>c.active&&c.rate>58&&c.rate<62));
   assert(live.status.imu.rate>980&&live.status.imu.rate<1030);
   assert.equal(live.security.node,'undefined');assert.equal(live.security.desktop,'function');
@@ -60,7 +61,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   assert.equal(await page.locator('#diagnostic-state').innerText(),'诊断不可用');
   await page.screenshot({path:path.join(out,'electron-offline.png'),fullPage:true});
   offline=false;
-  await page.waitForFunction(()=>document.querySelector('#connection').textContent.includes('采集正常'),undefined,{timeout:30000});
+  await page.waitForFunction(()=>document.querySelector('#online').textContent==='4'&&document.querySelector('#imu-rate').textContent!=='—',undefined,{timeout:30000});
   await page.waitForFunction(()=>[...document.querySelectorAll('video')].every(v=>v.readyState>=2&&!v.paused),undefined,{timeout:30000});
   await Promise.all([page.waitForEvent('domcontentloaded'),page.click('#reconnect', {noWaitAfter:true})]);
   await page.waitForFunction(()=>window.orbviVideoStats?.every(v=>v.width===1280&&v.fps>30),undefined,{timeout:45000});

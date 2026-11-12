@@ -6,6 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import subprocess
+import socket
 import threading
 import time
 import yaml
@@ -166,12 +167,16 @@ class Handler(BaseHTTPRequestHandler):
         if path in [f'/video/{i}.mp4' for i in range(4)]:
             self.video(int(path[7]))
             return
+        if path == '/video/live.x5us':
+            self.live_video()
+            return
         if path == '/api/status':
             data, mime = json.dumps(self.server.node.snapshot()).encode(), 'application/json'
-        elif path in ('/', '/dashboard.css', '/dashboard.js'):
+        elif path in ('/', '/dashboard.css', '/dashboard.js', '/preview.js'):
             name, mime = {'/': ('dashboard.html', 'text/html; charset=utf-8'),
                           '/dashboard.css': ('dashboard.css', 'text/css'),
-                          '/dashboard.js': ('dashboard.js', 'text/javascript')}[path]
+                          '/dashboard.js': ('dashboard.js', 'text/javascript'),
+                          '/preview.js': ('preview.js', 'text/javascript')}[path]
             data = Path(__file__).with_name(name).read_bytes()
         else:
             self.send_error(404)
@@ -185,6 +190,34 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(data)
         except (BrokenPipeError, ConnectionResetError):
             pass
+
+    def live_video(self):
+        if CONFIG['transport'].get('mode', 'adb') != 'usb':
+            self.send_error(409, 'Latest-frame preview requires USB mode')
+            return
+        upstream = None
+        try:
+            upstream = socket.create_connection((CONFIG['transport']['host'],
+                CONFIG['transport'].get('usb_port', 15700)), timeout=5)
+            self.connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            self.connection.settimeout(5)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/octet-stream')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Connection', 'close')
+            self.end_headers()
+            while True:
+                data = upstream.recv(65536)
+                if not data:
+                    break
+                self.wfile.write(data)
+                self.wfile.flush()
+        except OSError:
+            pass
+        finally:
+            self.close_connection = True
+            if upstream is not None:
+                upstream.close()
 
     def video(self, index):
         if CONFIG['transport'].get('mode','adb') == 'usb':

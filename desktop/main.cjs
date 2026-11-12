@@ -40,7 +40,7 @@ app.whenReady().then(() => {
     const url = new URL(request.url);
     if (url.host !== 'app' || request.method !== 'GET') return new Response('', {status: 403});
     const route = url.pathname;
-    if (route === '/api/status' || /^\/video\/[0-3]\.mp4$/.test(route)) {
+    if (route === '/api/status' || route === '/video/live.x5us' || /^\/video\/[0-3]\.mp4$/.test(route)) {
       try {
         if (route.startsWith('/video/')) {
           // Explicitly cancel upstream streams on reload/reconnect. A custom
@@ -62,7 +62,7 @@ app.whenReady().then(() => {
       }
     }
     const assets = {'/': ['dashboard.html', 'text/html; charset=utf-8'],
-      '/dashboard.css': ['dashboard.css', 'text/css'], '/dashboard.js': ['dashboard.js', 'text/javascript']};
+      '/dashboard.css': ['dashboard.css', 'text/css'], '/dashboard.js': ['dashboard.js', 'text/javascript'], '/preview.js': ['preview.js', 'text/javascript']};
     if (!assets[route]) return new Response('', {status: 404});
     const [file, type] = assets[route];
     return new Response(await fs.readFile(path.join(__dirname, 'ui', file)), {headers: {
