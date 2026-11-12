@@ -1,6 +1,7 @@
 #include "orbvi_driver/driver.hpp"
 #include "handshake.hpp"
 #include "duplicate_filter.hpp"
+#include "usb_runtime.hpp"
 #include "orbvi_driver/synchronizer.hpp"
 #include <orbvi_sdk/client.hpp>
 #include <orbvi_sdk/rtsp.hpp>
@@ -35,6 +36,7 @@ struct Driver::Impl {
   Stats counters;
   TimestampMatcher matcher;
   bool active=false;
+  std::unique_ptr<UsbRuntime> usb;
   explicit Impl(Config c):config(std::move(c)) { validate(config); }
   void frame(const orbvi_sdk::FrameView& f) {
     if(f.camera_index>=4) return;
@@ -86,9 +88,13 @@ Driver::Driver(Config c):impl_(std::make_unique<Impl>(std::move(c))) {}
 Driver::~Driver() {stop();}
 void Driver::start(Callbacks callbacks) {
   auto& p=*impl_;if(p.active)throw std::runtime_error("driver already started");
-  handshake(p.config);
+  if(p.config.transport_mode=="adb")handshake(p.config);
   {std::lock_guard<std::mutex> lock(p.mutex);p.counters={};p.matcher=TimestampMatcher{};}
   p.callbacks=std::move(callbacks);
+  if(p.config.transport_mode=="usb") {
+    p.usb=std::make_unique<UsbRuntime>(p.config,[&p](const auto& f){p.frame(f);},[&p](const auto& s){p.sample(s);});
+    p.usb->start();p.active=true;return;
+  }
   orbvi_sdk::RtspConfig r;for(unsigned i=0;i<4;++i)r.urls[i]="rtsp://"+p.config.host+":"+std::to_string(p.config.rtsp_base_port+i)+p.config.rtsp_path;
   p.images=orbvi_sdk::make_rtsp_client(r,orbvi_sdk::PixelFormat::bgr8);
   orbvi_sdk::UdpImuConfig u;u.bind_address=p.config.imu_bind_address;u.port=uint16_t(p.config.imu_port);
@@ -104,6 +110,7 @@ void Driver::start(Callbacks callbacks) {
 }
 void Driver::stop() noexcept {
   auto& p=*impl_;p.image_subscription.cancel();p.imu_subscription.cancel();
+  if(p.usb)p.usb->stop();
   static_cast<void>(p.images.stop());static_cast<void>(p.images.close());
   static_cast<void>(p.imu.stop());static_cast<void>(p.imu.close());p.active=false;
 }
@@ -111,6 +118,8 @@ Stats Driver::stats() const {
   const auto& p=*impl_;Stats s;{std::lock_guard<std::mutex> lock(p.mutex);s=p.counters;}
   auto a=p.image_subscription.stats(),b=p.imu_subscription.stats();
   s.image_callback_drops=a.dropped;s.imu_callback_drops=b.dropped;s.callback_failures=a.failed+b.failed;
+  if(p.usb){auto u=p.usb->stats();s.image_callback_drops+=u.image_drops;s.imu_callback_drops+=u.imu_drops;
+    s.transport_drops=u.mux_drops;s.transport_invalid=u.mux_invalid;if(!u.error.empty())s.error=u.error;}
   auto x=p.images.diagnostics(),y=p.imu.diagnostics();
   if(!x.last_error.empty())s.error=x.last_error;if(!y.last_error.empty())s.error+=y.last_error;
   return s;
@@ -132,9 +141,12 @@ bool capture_report(const Config& c,const Stats& before,const Stats& after,doubl
   auto skew_errors=after.sync_skew_errors-before.sync_skew_errors;
   auto unmatched=after.sync_unmatched_frames-before.sync_unmatched_frames;
   auto groups=after.sync_groups-before.sync_groups;
-  pass=pass&&!drops&&!failures&&!pair_errors&&!skew_errors&&!unmatched&&double(groups)>=c.fps*seconds*.97&&after.error.empty();
+  auto transport_drops=after.transport_drops-before.transport_drops;
+  auto transport_invalid=after.transport_invalid-before.transport_invalid;
+  pass=pass&&!drops&&!failures&&!pair_errors&&!skew_errors&&!unmatched&&!transport_drops&&!transport_invalid&&double(groups)>=c.fps*seconds*.97&&after.error.empty();
   s<<",\"callback_drops\":"<<drops<<",\"callback_failures\":"<<failures<<",\"imu_pairing_errors\":"<<pair_errors
    <<",\"sync_groups\":"<<groups<<",\"sync_unmatched_frames\":"<<unmatched<<",\"sync_skew_errors\":"<<skew_errors<<",\"last_camera_skew_ns\":"<<after.last_camera_skew_ns<<",\"max_camera_skew_ns_since_start\":"<<after.max_camera_skew_ns
+   <<",\"transport_drops\":"<<transport_drops<<",\"transport_invalid\":"<<transport_invalid
    <<",\"error\":"<<json_quote(after.error)<<",\"pass\":"<<(pass?"true":"false")<<'}';json=s.str();return pass;
 }
 }

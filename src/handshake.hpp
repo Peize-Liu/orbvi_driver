@@ -10,6 +10,20 @@
 #include <cmath>
 #include <stdexcept>
 namespace orbvi_driver {
+inline void verify_configuration(const Config& c,const YAML::Node& root) {
+  auto equal=[&](const YAML::Node& node,const char* key,double expected,double tol=1e-6){
+    const auto value=node[key].as<double>();if(!std::isfinite(value)||std::abs(value-expected)>std::max(tol,std::abs(expected)*tol))throw std::runtime_error(std::string("board configuration mismatch: ")+key);};
+  equal(root,"schema_version",1);equal(root,"width",c.width);equal(root,"height",c.height);equal(root,"fps",c.fps);equal(root,"bitrate_kbps",c.bitrate_kbps);
+  equal(root,"imu_frequency_hz",c.frequency_hz);equal(root,"accel_range_g",c.accel_range_g);equal(root,"gyro_range_dps",c.gyro_range_dps);
+  bool accel=false,gyro=false;
+  for(auto device:root["capabilities"]["imu"]) {
+    equal(device,"frequency_hz",c.frequency_hz);
+    if(device["name"].as<std::string>()=="icm42688-gyro") {equal(device,"scale",c.gyro_range_dps*3.141592653589793/180/32768,1e-8);gyro=true;}
+    else if(device["name"].as<std::string>()=="icm42688-accel") {equal(device,"scale",c.accel_range_g*9.80665/32768,1e-8);accel=true;}
+  }
+  if(!accel||!gyro)throw std::runtime_error("board handshake missing IMU devices");
+  if(root["transport_mode"]&&root["transport_mode"].as<std::string>()!=c.transport_mode)throw std::runtime_error("board transport mode mismatch");
+}
 inline void handshake(const Config& c) {
   addrinfo hints{},*addresses=nullptr;hints.ai_socktype=SOCK_STREAM;hints.ai_family=AF_INET;
   const auto port=std::to_string(c.control_port);
@@ -30,17 +44,6 @@ inline void handshake(const Config& c) {
   std::string response;char buffer[4096];ssize_t n;
   while((n=recv(fd,buffer,sizeof(buffer),0))>0){response.append(buffer,size_t(n));if(response.size()>65536)throw std::runtime_error("control response too large");}
   auto split=response.find("\r\n\r\n");if(n<0||split==std::string::npos||response.find("HTTP/1.0 200 OK")!=0)throw std::runtime_error("board config handshake failed");
-  auto root=YAML::Load(response.substr(split+4));
-  auto equal=[&](const YAML::Node& node,const char* key,double expected,double tol=1e-6){
-    const auto value=node[key].as<double>();if(!std::isfinite(value)||std::abs(value-expected)>std::max(tol,std::abs(expected)*tol))throw std::runtime_error(std::string("board configuration mismatch: ")+key);};
-  equal(root,"schema_version",1);equal(root,"width",c.width);equal(root,"height",c.height);equal(root,"fps",c.fps);equal(root,"bitrate_kbps",c.bitrate_kbps);
-  equal(root,"imu_frequency_hz",c.frequency_hz);equal(root,"accel_range_g",c.accel_range_g);equal(root,"gyro_range_dps",c.gyro_range_dps);
-  bool accel=false,gyro=false;
-  for(auto device:root["capabilities"]["imu"]) {
-    equal(device,"frequency_hz",c.frequency_hz);
-    if(device["name"].as<std::string>()=="icm42688-gyro") {equal(device,"scale",c.gyro_range_dps*3.141592653589793/180/32768,1e-8);gyro=true;}
-    else if(device["name"].as<std::string>()=="icm42688-accel") {equal(device,"scale",c.accel_range_g*9.80665/32768,1e-8);accel=true;}
-  }
-  if(!accel||!gyro)throw std::runtime_error("board handshake missing IMU devices");
+  verify_configuration(c,YAML::Load(response.substr(split+4)));
 }
 }

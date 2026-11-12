@@ -54,5 +54,6 @@ def main():
           '"-DCMAKE_PREFIX_PATH=/work/driver-noetic-install;/opt/ros/noetic" -DCMAKE_INSTALL_PREFIX=/work/unified-ros1-install; '
           'cmake --build /work/ros1-build -j3; cmake --install /work/ros1-build')
     run(['python3',ROOT/'tests/test_tunnel.py'])
+    run(['python3',ROOT/'tests/test_usb_board.py'])
 
 if __name__=='__main__':main()

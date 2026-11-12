@@ -2,16 +2,19 @@
 
 提供原生 C++、ROS 2 Humble、ROS 1 Noetic 三种接口，统一使用 [config/orbvi.yaml](config/orbvi.yaml)。
 
-当前版本通过 ADB 转发传输图像和 IMU；原生 USB UVC／Bulk 后端尚未接入。
+默认通过原生 USB Bulk 传输四路图像和 IMU。ADB 仅用于部署、启动和停止板端程序。
 
 ## 安装与启动
 
-以下命令在本包目录执行。Mac 需安装 Python 3、ADB 和 Docker，开发板通过 USB 连接。
+以下命令在本包目录执行。Mac 需安装 Python 3（含 PyYAML）、ADB、Docker、C++ 编译器、pkg-config 和 libusb，开发板通过 USB 连接。
 
 ```sh
+brew install libusb pkg-config
+python3 -m pip install PyYAML
 adb devices -l
 python3 tools/build.py all       # 首次构建
 python3 tools/control.py deploy  # 首次部署，或更新板端程序
+python3 tools/usb_host.py start --config config/orbvi.yaml
 python3 tools/control.py start --config config/orbvi.yaml
 ```
 
@@ -33,13 +36,14 @@ python3 tools/run_ros.py ros1 --config config/orbvi.yaml
 python3 tools/run_ros.py ros2 --config config/orbvi.yaml --dashboard
 ```
 
-网页地址：<http://127.0.0.1:18765/>。ROS 节点运行在 Docker 容器内。
+网页地址：<http://127.0.0.1:18765/>。ROS 节点运行在 Docker 容器内；Mac 的本机 libusb 接收器将 USB 数据交给容器。
 
 停止网页和板端采集：
 
 ```sh
 docker stop orbvi-dashboard      # 仅在网页运行时执行
 python3 tools/control.py stop
+python3 tools/usb_host.py stop
 ```
 
 ## 可选配置
@@ -48,6 +52,10 @@ python3 tools/control.py stop
 
 | 字段 | 可选值 | 默认值 |
 | --- | --- | --- |
+| `transport.mode` | `usb` 原生 Bulk；`adb` 兼容转发 | `usb` |
+| `transport.usb_backend` | `bridge` 接收本机 USB 服务；`direct` 在 Linux 直接打开 USB | `bridge` |
+| `transport.usb_port` | 本机 USB 服务端口，网页另用此端口 +10…+13 | 15700 |
+| `transport.usb_serial` | 多板连接时指定 USB 序列号；空值自动选择唯一设备 | 空 |
 | `camera.width` / `camera.height` | 1280×1088、1280×720、720×480、640×480、480×720、480×640 | 1280×1088 |
 | `camera.fps` | 25、30、40、50、60 | 60 |
 | `camera.bitrate_kbps` | 1–100000，单位 kbps，每路编码码率 | 4000 |
@@ -78,7 +86,9 @@ imu:
 
 ```sh
 python3 tools/control.py stop
+python3 tools/usb_host.py stop
 python3 tools/control.py check --config config/orbvi.yaml
+python3 tools/usb_host.py start --config config/orbvi.yaml
 python3 tools/control.py start --config config/orbvi.yaml
 python3 tools/run_ros.py ros2 --config config/orbvi.yaml
 ```
@@ -99,7 +109,7 @@ ROS 1 和 ROS 2 使用相同的 Topic 名称：
 
 ## C++ 接入
 
-Linux 编译需要 CMake、C++17、yaml-cpp 和 FFmpeg 4.4+ 开发库：
+Linux 编译需要 CMake、C++17、pkg-config、libusb、yaml-cpp 和 FFmpeg 4.4+ 开发库：
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$PWD/install"
@@ -135,10 +145,11 @@ driver.stop();
 
 回调中避免耗时操作，不要在回调内调用 `stop()`。
 
-原生 Linux 接收时，先用 `control.py start` 建立 ADB 转发，将配置 `transport.host` 设为 `127.0.0.1`，再另开终端运行 IMU 中继：
+原生 Linux 接收时设置 `transport.mode: usb` 和 `transport.usb_backend: direct`，应用直接打开 USB，无需本机中继。运行用户需有 USB 设备访问权限。Ubuntu 可安装设备规则，然后重新插拔 USB：
 
 ```sh
-python3 tools/imu_tunnel.py client --host 127.0.0.1 --tcp-port 15601 --udp-port 5600
+sudo install -m 644 config/99-orbvi-usb.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules
 ```
 
-`--udp-port` 须匹配配置 `transport.imu_port`。Docker 启动命令已包含默认中继。
+如需使用原来的 ADB 模式，停止接收器、USB 本机服务和板端采集后，使用 `config/orbvi-adb.yaml` 启动板端及所需接口，无需启动 `usb_host.py`。

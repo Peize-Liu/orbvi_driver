@@ -19,3 +19,5 @@ RUN echo 'f9514e0d3515aee5a271283df71636e1d1ff7274b15853bcd84e144be416ab07  /tmp
     && make -j3 && make install && rm -rf /tmp/ffmpeg /tmp/ffmpeg.tar.xz
 ENV PKG_CONFIG_PATH=/opt/orbvi/ffmpeg/lib/pkgconfig
 ENV LD_LIBRARY_PATH=/opt/orbvi/ffmpeg/lib
+
+RUN apt-get update && apt-get install -y --no-install-recommends libusb-1.0-0-dev && rm -rf /var/lib/apt/lists/*

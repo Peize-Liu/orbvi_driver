@@ -11,13 +11,20 @@ namespace { volatile sig_atomic_t stopping=0; void stop(int) { stopping=1; } }
 int main(int argc,char** argv) {
   try {
     if(argc<2) throw std::runtime_error("usage: orbvi_board probe | check CONFIG | run CONFIG SENSOR_EXECUTABLE");
-    const std::string mode=argv[1]; auto devices=orbvi_driver::probe_imu();
+    const std::string mode=argv[1];
+    if(mode=="transport"&&argc==3){std::cout<<orbvi_driver::load_config(argv[2]).transport_mode<<'\n';return 0;}
+    auto devices=orbvi_driver::probe_imu();
     if(mode=="probe"&&argc==2) { std::cout<<orbvi_driver::capabilities_json(devices)<<'\n';return 0; }
     if((mode=="check"&&argc!=3)||(mode=="run"&&argc!=4)||(mode!="check"&&mode!="run"))
       throw std::runtime_error("invalid command arguments");
     const auto c=orbvi_driver::load_config(argv[2]); orbvi_driver::check_board(c,devices);
     if(mode=="check") { std::cout<<"configuration supported by exposed BSP capabilities\n";return 0; }
     orbvi_driver::BoardSettings settings(c,devices);
+    if(c.transport_mode=="usb") {
+      std::string path=argv[2];auto slash=path.find_last_of('/');
+      path=(slash==std::string::npos?".":path.substr(0,slash))+"/camera.sock";
+      setenv("ORBVI_USB_CAMERA_SOCKET",path.c_str(),1);
+    }else unsetenv("ORBVI_USB_CAMERA_SOCKET");
     ControlServer server;
     std::vector<std::string> args{argv[3],"--external-sync","--channels","4","--width",std::to_string(c.width),
       "--height",std::to_string(c.height),"--fps",std::to_string(c.fps),"--bps",std::to_string(c.bitrate_kbps),

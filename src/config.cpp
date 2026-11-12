@@ -17,6 +17,9 @@ const std::vector<std::pair<int,int>>& camera_sizes() {
 }
 const std::vector<int>& camera_rates() { static const std::vector<int> v{25,30,40,50,60}; return v; }
 void validate(const Config& c) {
+  if(c.transport_mode!="adb"&&c.transport_mode!="usb")throw std::runtime_error("transport.mode must be adb or usb");
+  if(c.usb_backend!="direct"&&c.usb_backend!="bridge")throw std::runtime_error("transport.usb_backend must be direct or bridge");
+  if(c.usb_port<1||c.usb_port>65535)throw std::runtime_error("invalid USB bridge port");
   if (std::find(camera_sizes().begin(),camera_sizes().end(),std::make_pair(c.width,c.height))==camera_sizes().end())
     throw std::runtime_error("camera resolution is not validated: use 1280x1088, 1280x720, 720x480, 640x480, 480x720 or 480x640; portrait height 1280 fails this BSP pipeline");
   if (std::find(camera_rates().begin(),camera_rates().end(),c.fps)==camera_rates().end())
@@ -39,9 +42,10 @@ void validate(const Config& c) {
     throw std::runtime_error("invalid ros.topic_prefix");
   if(c.rtsp_path!="/live/PRR")throw std::runtime_error("USB board profile requires rtsp_path=/live/PRR");
 }
-static void keys(const YAML::Node& n, std::initializer_list<const char*> allowed, const std::string& path) {
+static void keys(const YAML::Node& n, std::initializer_list<const char*> allowed, const std::string& path,std::initializer_list<const char*> optional={}) {
   if(!n.IsMap()) throw std::runtime_error(path+" must be a map");
   std::set<std::string> valid,seen; for(auto k:allowed) valid.insert(k);
+  for(auto k:optional)valid.insert(k);
   for(auto entry:n) { auto k=entry.first.as<std::string>();
     if(!valid.count(k)||!seen.insert(k).second) throw std::runtime_error("unknown or duplicate key: "+path+"."+k); }
   for(auto k:allowed) if(!n[k]) throw std::runtime_error("missing key: "+path+"."+k);
@@ -53,9 +57,13 @@ Config load_config(const std::string& path) {
   auto a=root["camera"], b=root["imu"], t=root["transport"], r=root["runtime"], s=root["ros"];
   keys(a,{"width","height","fps","bitrate_kbps"},"camera");
   keys(b,{"frequency_hz","accel_range_g","gyro_range_dps"},"imu");
-  keys(t,{"host","rtsp_base_port","rtsp_path","imu_bind_address","imu_port","control_port"},"transport");
+  keys(t,{"host","rtsp_base_port","rtsp_path","imu_bind_address","imu_port","control_port"},"transport",{"mode","usb_backend","usb_serial","usb_port"});
   keys(r,{"image_queue","imu_queue"},"runtime"); keys(s,{"topic_prefix","image_queue","imu_queue"},"ros");
   Config c;
+  if(t["mode"])c.transport_mode=t["mode"].as<std::string>();
+  if(t["usb_backend"])c.usb_backend=t["usb_backend"].as<std::string>();
+  if(t["usb_serial"])c.usb_serial=t["usb_serial"].as<std::string>();
+  if(t["usb_port"])c.usb_port=t["usb_port"].as<int>();
   c.width=a["width"].as<int>(); c.height=a["height"].as<int>(); c.fps=a["fps"].as<int>(); c.bitrate_kbps=a["bitrate_kbps"].as<int>();
   c.frequency_hz=b["frequency_hz"].as<double>(); c.accel_range_g=b["accel_range_g"].as<double>(); c.gyro_range_dps=b["gyro_range_dps"].as<double>();
   c.host=t["host"].as<std::string>(); c.rtsp_base_port=t["rtsp_base_port"].as<int>(); c.rtsp_path=t["rtsp_path"].as<std::string>();

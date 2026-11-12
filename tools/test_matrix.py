@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import yaml
 from control import connection, remote
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -26,8 +27,11 @@ def main():
     args=parser.parse_args()
     if not 1<=args.seconds<=3600:parser.error('invalid seconds')
     output=ROOT/'reports/camera-matrix.json'
-    configurations=ROOT/'reports/configs';configurations.mkdir(exist_ok=True)
+    configurations=ROOT/'reports/configs';configurations.mkdir(parents=True,exist_ok=True)
     text=(ROOT/'config/orbvi.yaml').read_text()
+    usb=yaml.safe_load(text)['transport'].get('mode','adb')=='usb'
+    def host(action):
+        if usb:subprocess.run([sys.executable,str(ROOT/'tools/usb_host.py'),action],check=True,capture_output=True)
     results=json.loads(output.read_text()) if args.resume and output.exists() else []
     done={r['mode'] for r in results}
     try:
@@ -44,7 +48,9 @@ def main():
                 path=configurations/(mode.replace('@','-')+'.yaml');path.write_text(config)
                 try:
                     stopped=command(['stop'])
+                    host('stop')
                     if stopped.returncode:raise RuntimeError(stopped.stdout+stopped.stderr)
+                    host('start')
                     started=command(['start','--config',path])
                     if started.returncode:raise RuntimeError(started.stdout+started.stderr)
                     captured=command(['capture','--config',path,'--seconds',args.seconds],args.seconds+60)
@@ -62,7 +68,9 @@ def main():
                 print(f'{len(results):02d} {mode}: '+('PASS' if result['pass_test'] else 'FAIL'),flush=True)
     finally:
         stopped=command(['stop'])
+        host('stop')
         if stopped.returncode:raise RuntimeError('could not stop test capture: '+stopped.stderr+stopped.stdout)
+        host('start')
         restored=command(['start'])
         if restored.returncode:raise RuntimeError('could not restore default capture: '+restored.stderr+restored.stdout)
     print(f'Saved {output}',flush=True)

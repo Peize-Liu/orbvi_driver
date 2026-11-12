@@ -30,6 +30,7 @@ struct Stats {
   uint64_t sync_groups=0,max_camera_skew_ns=0,imu_pairing_errors=0;
   uint64_t sync_skew_errors=0,last_camera_skew_ns=0;
   uint64_t sync_unmatched_frames=0;
+  uint64_t transport_drops=0,transport_invalid=0;
   std::string error;
 };
 struct Callbacks {

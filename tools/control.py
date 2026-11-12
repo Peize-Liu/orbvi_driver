@@ -37,9 +37,7 @@ def main():
         run(['docker','run','--rm','--init','--label','com.orbvi.unified=capture',
              '-v', str(ROOT)+':/sources/orbvi_driver','-v','orbvi-driver-build:/work',
              '-v',str(config)+':/capture.yaml:ro', 'orbvi-driver:humble','bash','-c',
-             'python3 -u /sources/orbvi_driver/tools/imu_tunnel.py client --tcp-port 15601 --udp-port 5600 >&2 & '
-             'relay=$!; trap "kill $relay 2>/dev/null || true" EXIT; '
-             f'/work/driver-install/bin/orbvi_capture /capture.yaml {args.seconds} 3'])
+             f'bash /sources/orbvi_driver/tools/capture.sh {args.seconds}'])
         return
     adb=connection()
     ctl=shlex.quote(BOARD_PYTHON)+' '+BOARD+'/board_control.py '
@@ -54,7 +52,7 @@ def main():
             if was_running:
                 for local,_ in PORTS:
                     subprocess.run([str(x) for x in adb]+['forward','--remove',f'tcp:{local}'],capture_output=True)
-        for path in [ROOT/'backend',ROOT/'tools/board_control.py',ROOT/'tools/imu_tunnel.py']:
+        for path in [ROOT/'backend',ROOT/'tools/board_control.py',ROOT/'tools/imu_tunnel.py',ROOT/'tools/usb_board.py']:
             run(adb+['push',path,BOARD+'/'])
         run(adb+['push',ROOT/'tools/orbvi_board-aarch64',BOARD+'/orbvi_board'])
         print(remote(adb,'chmod +x '+BOARD+'/orbvi_board'))
@@ -69,7 +67,8 @@ def main():
         print(remote(adb,BOARD+'/orbvi_board check '+BOARD+'/config.yaml'))
         added=[]
         try:
-            for local, target in PORTS:
+            mode=remote(adb,BOARD+'/orbvi_board transport '+BOARD+'/config.yaml').strip()
+            for local, target in (PORTS if mode=='adb' else []):
                 run(adb+['forward','--no-rebind',f'tcp:{local}',f'tcp:{target}']);added.append(local)
             print(remote(adb,ctl+'start'))
         except BaseException:

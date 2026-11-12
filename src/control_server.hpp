@@ -33,7 +33,7 @@ class ControlServer {
           std::string body,status="200 OK";
           try {
             auto actual=orbvi_driver::probe_imu();orbvi_driver::check_board(c,actual);
-            std::ostringstream s;s<<"{\"schema_version\":1,\"width\":"<<c.width<<",\"height\":"<<c.height<<",\"fps\":"<<c.fps
+            std::ostringstream s;s<<"{\"schema_version\":1,\"transport_mode\":"<<orbvi_driver::json_quote(c.transport_mode)<<",\"width\":"<<c.width<<",\"height\":"<<c.height<<",\"fps\":"<<c.fps
               <<",\"bitrate_kbps\":"<<c.bitrate_kbps<<",\"imu_frequency_hz\":"<<c.frequency_hz
               <<",\"accel_range_g\":"<<c.accel_range_g<<",\"gyro_range_dps\":"<<c.gyro_range_dps
               <<",\"capabilities\":"<<orbvi_driver::capabilities_json(actual)<<'}';body=s.str();

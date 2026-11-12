@@ -52,12 +52,17 @@ def start():
             if (device / 'buffer/enable').read_text().strip() != '0':
                 raise RuntimeError(f'{device} is busy')
     records = []
+    mode = subprocess.check_output([str(ROOT/'orbvi_board'), 'transport', str(ROOT/'config.yaml')], text=True).strip()
+    if mode=='usb' and not Path('/run/x5-usb-gadget/bulk.sock').is_socket():
+        raise RuntimeError('BSP USB Bulk socket is unavailable; combined USB gadget must already be running')
     jobs = [
         ('tunnel', [sys.executable, '-u', str(ROOT / 'imu_tunnel.py'), 'server',
                     '--tcp-port', '6561', '--udp-port', '5601']),
         ('sensor', [str(ROOT / 'orbvi_board'), 'run', str(ROOT / 'config.yaml'),
                     str(ROOT / 'backend/sensor_demo')]),
     ]
+    if mode == 'usb':
+        jobs[0] = ('usb', [sys.executable, '-u', str(ROOT/'usb_board.py')])
     try:
         for name, command in jobs:
             with (ROOT / (name + '.log')).open('w') as log:

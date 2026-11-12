@@ -35,7 +35,10 @@ PY
   node=(/work/unified-ros1-install/lib/orbvi_driver_ros1/orbvi_node _config:=/capture.yaml)
   checker=/work/unified-ros1-install/lib/orbvi_driver_ros1/orbvi_ros_check
 fi
-python3 -u /sources/orbvi_driver/tools/imu_tunnel.py client --tcp-port 15601 --udp-port 5600 >&2 & children+=($!)
+transport=$(python3 -c "import yaml; print(yaml.safe_load(open('/capture.yaml'))['transport'].get('mode','adb'))")
+if [ "$transport" = adb ]; then
+  python3 -u /sources/orbvi_driver/tools/imu_tunnel.py client --tcp-port 15601 --udp-port 5600 >&2 & children+=($!)
+fi
 "${node[@]}" >&2 & children+=($!)
 if [ "$action" = check ]; then
   "$checker" /capture.yaml "$seconds"

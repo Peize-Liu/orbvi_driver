@@ -93,11 +93,12 @@ int main(int argc,char** argv){
       for(unsigned i=0;i<4;++i){add("camera_"+std::to_string(i)+"_count",s.cameras[i].count);gaps+=s.cameras[i].gaps;invalid+=s.cameras[i].invalid;duplicates+=s.cameras[i].duplicates_filtered;discontinuities+=s.cameras[i].discontinuities;}
       add("imu_count",s.imu.count);add("sequence_gaps",gaps);add("invalid",invalid);add("image_callback_drops",s.image_callback_drops);
       add("duplicates_filtered",duplicates);add("discontinuities",discontinuities);
+      add("transport_drops",s.transport_drops);add("transport_invalid",s.transport_invalid);
       add("imu_last_sequence",s.imu.last_sequence);add("imu_last_timestamp_ns",s.imu.last_timestamp_ns);
       add("imu_gaps",s.imu.gaps);add("imu_discontinuities",s.imu.discontinuities);
       add("imu_callback_drops",s.imu_callback_drops);add("callback_failures",s.callback_failures);add("imu_pairing_errors",s.imu_pairing_errors);
       add("max_camera_skew_ns",s.max_camera_skew_ns);
-      if(status.level==0&&(gaps||invalid||duplicates||discontinuities||s.image_callback_drops||s.imu_callback_drops||s.callback_failures||s.imu_pairing_errors))status.level=1;
+      if(status.level==0&&(gaps||invalid||duplicates||discontinuities||s.transport_drops||s.transport_invalid||s.image_callback_drops||s.imu_callback_drops||s.callback_failures||s.imu_pairing_errors))status.level=1;
       array.status.push_back(status);publish<diagnostic::DiagnosticArray>(diagnostics,std::move(array));
     };
 #ifdef ORBVI_ROS2

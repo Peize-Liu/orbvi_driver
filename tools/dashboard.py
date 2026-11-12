@@ -112,13 +112,17 @@ class Dashboard(Node):
                 continue
             count, stamp = int(values['imu_count']), int(values['imu_last_timestamp_ns'])
             with self.lock:
+                advanced = stamp > 0 and stamp != self.imu.stamp
                 if self.imu.stamp and stamp > self.imu.stamp and count >= self.imu.count:
                     self.imu_rate = (count-self.imu.count)*1e9/(stamp-self.imu.stamp)
+                else:
+                    self.imu_rate = 0.
                 self.imu.count, self.imu.stamp = count, stamp
                 self.imu.sequence = int(values['imu_last_sequence'])
                 self.imu.gaps = int(values['imu_gaps'])
                 self.imu.resets = int(values['imu_discontinuities'])
-                self.imu.last = time.monotonic()
+                if advanced:
+                    self.imu.last = time.monotonic()
 
     def imu_sample(self, message):
         now = time.monotonic()
@@ -173,8 +177,13 @@ class Handler(BaseHTTPRequestHandler):
             pass
 
     def video(self, index):
-        command = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-rtsp_transport', 'tcp',
-                   '-stimeout', '10000000', '-i', f"rtsp://{CONFIG['transport']['host']}:{CONFIG['transport']['rtsp_base_port']+index}{CONFIG['transport']['rtsp_path']}",
+        if CONFIG['transport'].get('mode','adb') == 'usb':
+            endpoint = f"tcp://{CONFIG['transport']['host']}:{CONFIG['transport'].get('usb_port',15700)+10+index}"
+            source = ['-r',str(CONFIG['camera']['fps']),'-f','h264','-i',endpoint]
+        else:
+            source = ['-rtsp_transport','tcp','-stimeout','10000000','-i',
+                      f"rtsp://{CONFIG['transport']['host']}:{CONFIG['transport']['rtsp_base_port']+index}{CONFIG['transport']['rtsp_path']}"]
+        command = ['ffmpeg', '-hide_banner', '-loglevel', 'error', *source,
                    '-map', '0:v:0', '-an', '-c:v', 'copy', '-movflags',
                    'empty_moov+default_base_moof+frag_keyframe', '-frag_duration', '33333',
                    '-flush_packets', '1', '-f', 'mp4', 'pipe:1']

@@ -1,4 +1,5 @@
 #include "rtsp_server.hpp"
+#include "usb_output.hpp"
 #include "mk_mediakit.h"
 #include <algorithm>
 #include <chrono>
@@ -17,6 +18,7 @@ struct RtspServer::State {
     bool record_failed = false;
     mk_media media = nullptr;
     bool initialized = false;
+    UsbOutput usb{};
 };
 
 RtspServer::RtspServer(unsigned port, std::string path, Codec codec, std::string record_directory)
@@ -66,6 +68,7 @@ int RtspServer::push(const void *data, size_t size, uint64_t timestamp_ns, const
     }
     if (metadata) {
         if (state.codec != Codec::H264 || metadata->timestamp_ns != timestamp_ns) return -1;
+        state.usb.push(data,size,*metadata);
         const auto sei = frame_metadata_sei(*metadata);
         mk_frame meta_frame = mk_frame_create(MKCodecH264, timestamp_ns / 1000000, timestamp_ns / 1000000,
                                               reinterpret_cast<const char *>(sei.data()), sei.size(), nullptr, nullptr);

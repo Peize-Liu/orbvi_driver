@@ -7,7 +7,7 @@ import subprocess
 import sys
 ROOT=Path(__file__).resolve().parents[1]
 source=(ROOT/'config/orbvi.yaml').read_text()
-directory=ROOT/'reports/imu-configs';directory.mkdir(exist_ok=True)
+directory=ROOT/'reports/imu-configs';directory.mkdir(parents=True,exist_ok=True)
 results=[]
 for key,values in [('frequency_hz',[25,50,100,200,500,1000,2000]),
                    ('accel_range_g',[2,4,8,16]),

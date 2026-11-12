@@ -9,6 +9,10 @@ imu:
   accel_range_g: 16
   gyro_range_dps: 2000
 transport:
+  mode: usb
+  usb_backend: bridge
+  usb_port: 15700
+  usb_serial: ""
   host: host.docker.internal
   rtsp_base_port: 15554
   control_port: 15602
